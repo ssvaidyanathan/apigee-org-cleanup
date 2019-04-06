@@ -1,0 +1,17 @@
+{
+  "name": "apigee-org-cleanup",
+  "version": "1.0.0",
+  "description": "Clean up script for Apigee Orgs",
+  "main": "cleanup.js",
+  "scripts": {
+    "test": "node cleanup.js"
+  },
+  "author": "Sai Saran Vaidyanathan (ssvaidyanathan)",
+  "license": "MIT",
+  "dependencies": {
+    "prompt": "^1.0.0",
+    "request": "^2.88.0",
+    "request-promise": "^4.2.4"
+  }
+}
+
