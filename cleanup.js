@@ -34,7 +34,7 @@ prompt.get(schema, async function (err, config) {
   await deleteAPIProducts(config);
   await deleteReports(config);
   await deleteSharedFlows(config);
-  //await deleteExtensions(config);
+  await deleteExtensions(config);
   await deleteAPIProxies(config);
   await deleteAPIPortals(config);
   await deleteSpecs(config);
@@ -137,11 +137,15 @@ async function deleteAPIPortals(config){
 }
 
 async function deleteExtensions(config){
-	console.log("Deleting Extensions on "+env);
 	let accessToken = await getAccessToken(config);
-	let envs = ["test", "prod"];
+	let envs = ["test", "prod", "portal"];
 	for (env of envs){
-		await deleteAllExtensionsInEnv(config, accessToken, env)
+		let extensions = await getAllExtensionsInEnv(config, accessToken, env);
+		console.log(extensions);
+		for (extension of extensions){
+			await undeployExtension(accessToken, extension);
+			await deleteExtension(accessToken, extension);
+		}
 	}
 }
 
@@ -213,10 +217,56 @@ async function deleteSpec(config, accessToken, spec){
 	}
 }
 
-async function deleteAllExtensionsInEnv(config, accessToken, env){
+
+async function undeployExtension(accessToken, extension){
+	console.log("Undeploying extensions in "+env+" environment");
+	let options = {
+	    method: "PATCH",
+	    uri: extension,
+	    headers: {
+        	"Authorization": "Bearer "+accessToken
+    	},
+    	body: {
+        	state: "UNDEPLOYED"
+    	},
+	    json: true
+	};
+	try{
+		let parsedBody = await rp(options);
+		return parsedBody;
+	}
+	catch(err){
+		console.log(err);
+	}
+}
+
+async function getAllExtensionsInEnv(config, accessToken, env){
+	let options = {
+	    method: "GET",
+	    uri: "https://api.enterprise.apigee.com/v1/organizations/"+config.org+"/environments/"+env+"/extensions",
+	    headers: {
+        	"Authorization": "Bearer "+accessToken
+    	},
+	    json: true
+	};
+	try{
+		let parsedBody = await rp(options);
+		let contents = parsedBody.contents;
+		let extensions = [];
+		for (content of contents){
+			extensions.push(content.self);
+		}
+		return extensions;
+	}
+	catch(err){
+		console.log(err);
+	}
+}
+
+async function deleteExtension(accessToken, extension){
 	let options = {
 	    method: "DELETE",
-	    uri: "https://api.enterprise.apigee.com/v1/organizations/"+config.org+"/environments/"+env+"/extensions",
+	    uri: extension,
 	    headers: {
         	"Authorization": "Bearer "+accessToken
     	},
@@ -315,5 +365,4 @@ async function getAccessToken(config){
 		console.log(err);
 	}
 }
-
 
