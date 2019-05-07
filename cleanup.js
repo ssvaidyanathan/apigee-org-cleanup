@@ -1,6 +1,7 @@
 var prompt = require("prompt");
 var colors = require("colors/safe");
 const rp = require("request-promise");
+var util = require("util");
 
 var schema = {
     properties: {
@@ -44,93 +45,129 @@ let mgmtURL = "https://api.enterprise.apigee.com/v1/organizations";
 let mgmtOAuthURL = "https://login.apigee.com/oauth/token";
 
 async function deleteAppsAndDevelopers(config){
-	console.log("Deleting Apps");
+	safeLog("Deleting Apps");
 	let developers = await getEntities(config, "developers");
-	console.log("Developers: "+developers);
+	if (developers == null) {
+		safeLog("Developers: NONE");
+		return;
+	}
+	safeLog("Developers: "+developers);
 	for (developer of developers){
-		console.log("Fetching Apps for "+developer);
+		safeLog("Fetching Apps for "+developer);
 	  	let apps = await getEntities(config, "developers/"+developer+"/apps");
-	  	console.log("Apps: "+apps);
+			if (apps == null) {
+				safeLog("Apps: NONE");
+				continue;
+			}
+	  	safeLog("Apps: "+apps);
 	  	for (app of apps){
 	  		await deleteEntities(config, "developers/"+developer+"/apps/"+app);
 	  	}
-	  	console.log("Deleting developer: "+developer);
+	  	safeLog("Deleting developer: "+developer);
 	  	await deleteEntities(config, "developers/"+developer);
 	}
 }
 
 async function deleteAPIProducts(config){
-	console.log("Deleting API Products");
+	safeLog("Deleting API Products");
 	let apiproducts = await getEntities(config, "apiproducts");
-	console.log("API Products: "+apiproducts);
+	if (apiproducts == null) {
+		safeLog("API Products: NONE");
+		return;
+	}
+	safeLog("API Products: "+apiproducts);
 	for (apiproduct of apiproducts){
-	  	console.log("Deleting API Product: "+apiproduct);
+	  	safeLog("Deleting API Product: "+apiproduct);
 	  	await deleteEntities(config, "apiproducts/"+apiproduct);
 	}
 }
 
 async function deleteReports(config){
-	console.log("Deleting Custom Reports");
+	safeLog("Deleting Custom Reports");
 	let reports = await getEntities(config, "reports");
+	if (reports == null) {
+		safeLog("Reports: NONE");
+		return;
+	}
 	for (report of reports.qualifier){
-	  	console.log("Deleting Report: "+report.name);
+	  	safeLog("Deleting Report: "+report.name);
 	  	await deleteEntities(config, "reports/"+report.name);
 	}
 }
 
 async function deleteSharedFlows(config){
-	console.log("Deleting SharedFlows");
+	safeLog("Deleting SharedFlows");
 	let sharedFlows = await getEntities(config, "sharedflows");
-	console.log("Sharedflows: "+sharedFlows);
+	if (sharedFlows == null) {
+		safeLog("Sharedflows: NONE");
+		return;
+	}
+	safeLog("Sharedflows: "+sharedFlows);
 	for (sharedFlow of sharedFlows){
 	  	let resp = await getEntities(config, "sharedflows/"+sharedFlow+"/deployments");
+			if (resp == null) {
+				safeLog("Deployments: NONE");
+				continue;
+			}
 	  	for (e of resp.environment){
 	  		//if(e.name === config.env){
+					if (e == null || e.revision == null || e.revision[0] == null || e.revision[0].name == null) {
+						safeLog("Failed to resolve revision.")
+						continue;
+					}
 	  			let revision = e.revision[0].name;
-	  			console.log("Undeploying Revision:"+revision+" of sharedflow: "+sharedFlow);
+	  			safeLog("Undeploying Revision:"+revision+" of sharedflow: "+sharedFlow);
 	  			await deleteEntities(config, "/environments/"+e.name+"/sharedflows/"+sharedFlow+"/revisions/"+revision+"/deployments");
 	  		//}
 	  	}
-	  	console.log("Deleting sharedflow: "+sharedFlow);
+	  	safeLog("Deleting sharedflow: "+sharedFlow);
 	  	await deleteEntities(config, "sharedflows/"+sharedFlow);
 	}
 }
 
 async function deleteAPIProxies(config){
-	console.log("Deleting API Proxies");
+	safeLog("Deleting API Proxies");
 	let apis = await getEntities(config, "apis");
+	if (apis === null) {
+		safeLog("API Proxies: NONE");
+		return;
+	}
 	let ignoreAPIs = ["oauth", "helloworld", "apigee-test_bundle"];
 	apis = apis.filter(item => !ignoreAPIs.includes(item));
-	console.log("API Proxies: "+apis);
+	safeLog("API Proxies: "+apis);
 	for (api of apis){
 	  	let resp = await getEntities(config, "apis/"+api+"/deployments");
+			if (resp === null) {
+				safeLog("Deployments: NONE");
+				return;
+			}
 	  	for (e of resp.environment){
 	  		//if(e.name === config.env){
 	  			let revision = e.revision[0].name;
-	  			console.log("Undeploying Revision:"+revision+" of API Proxy: "+api);
+	  			safeLog("Undeploying Revision:"+revision+" of API Proxy: "+api);
 	  			await deleteEntities(config, "/environments/"+e.name+"/apis/"+api+"/revisions/"+revision+"/deployments");
 	  		//}
 	  	}
-	  	console.log("Deleting API Proxy: "+api);
+	  	safeLog("Deleting API Proxy: "+api);
 	  	await deleteEntities(config, "apis/"+api);
 	}
 }
 
 async function deleteSpecs(config){
-	console.log("Deleting Specs");
+	safeLog("Deleting Specs");
 	let accessToken = await getAccessToken(config);
 	let specs = await getSpecs(config, accessToken);
-	console.log(specs);
+	safeLog(specs);
 	for (spec of specs){
 		await deleteSpec(config, accessToken, spec)
 	}
 }
 
 async function deleteAPIPortals(config){
-	console.log("Deleting API Portals");
+	safeLog("Deleting API Portals");
 	let accessToken = await getAccessToken(config);
 	let portals = await getPortals(config, accessToken);
-	console.log(portals);
+	safeLog(portals);
 	for (portal of portals){
 		await deletePortal(config, accessToken, portal)
 	}
@@ -141,7 +178,11 @@ async function deleteExtensions(config){
 	let envs = ["test", "prod", "portal"];
 	for (env of envs){
 		let extensions = await getAllExtensionsInEnv(config, accessToken, env);
-		console.log(extensions);
+		if (extensions == null) {
+			safeLog("No extensions found in "+env);
+			continue;
+		}
+		safeLog(extensions);
 		for (extension of extensions){
 			await undeployExtension(accessToken, extension);
 			await deleteExtension(accessToken, extension);
@@ -169,7 +210,7 @@ async function getSpecs(config, accessToken){
 		return specs;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
 }
 
@@ -193,12 +234,12 @@ async function getPortals(config, accessToken){
 		return portals;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
 }
 
 async function deleteSpec(config, accessToken, spec){
-	console.log("Deleting spec: "+spec);
+	safeLog("Deleting spec: "+spec);
 	let options = {
 	    method: "DELETE",
 	    uri: "https://api.enterprise.apigee.com/v1"+spec,
@@ -213,13 +254,13 @@ async function deleteSpec(config, accessToken, spec){
 		return parsedBody;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
 }
 
 
 async function undeployExtension(accessToken, extension){
-	console.log("Undeploying extensions in "+env+" environment");
+	safeLog("Undeploying extensions in "+env+" environment");
 	let options = {
 	    method: "PATCH",
 	    uri: extension,
@@ -236,7 +277,7 @@ async function undeployExtension(accessToken, extension){
 		return parsedBody;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
 }
 
@@ -259,7 +300,7 @@ async function getAllExtensionsInEnv(config, accessToken, env){
 		return extensions;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
 }
 
@@ -277,12 +318,12 @@ async function deleteExtension(accessToken, extension){
 		return parsedBody;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
 }
 
 async function deletePortal(config, accessToken, portal){
-	console.log("Deleting API Portal: "+portal);
+	safeLog("Deleting API Portal: "+portal);
 	let options = {
 	    method: "POST",
 	    uri: "https://apigee.com/portals/api/sites/"+portal+"/trash",
@@ -297,13 +338,13 @@ async function deletePortal(config, accessToken, portal){
 		return parsedBody;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
 }
 
 
 async function getEntities(config, entity){
-	//console.log("Fetching "+entity+" from Apigee org: "+config.org);
+	//safeLog("Fetching "+entity+" from Apigee org: "+config.org);
 	let auth = Buffer.from(config.username+":"+config.password).toString('base64')
 	let options = {
 	    method: "GET",
@@ -318,12 +359,13 @@ async function getEntities(config, entity){
 		return parsedBody;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
+		return null;
 	}
 }
 
 async function deleteEntities(config, entity){
-	console.log("Deleting "+entity+" from Apigee org: "+config.org);
+	safeLog("Deleting "+entity+" from Apigee org: "+config.org);
 	let auth = Buffer.from(config.username+":"+config.password).toString('base64')
 	let options = {
 	    method: "DELETE",
@@ -338,12 +380,12 @@ async function deleteEntities(config, entity){
 		return parsedBody;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
 }
 
 async function getAccessToken(config){
-	console.log("Getting OAuth Access token");
+	safeLog("Getting OAuth Access token");
 	let options = {
 	    method: "POST",
 	    uri: mgmtOAuthURL,
@@ -362,7 +404,13 @@ async function getAccessToken(config){
 		return accessToken;
 	}
 	catch(err){
-		console.log(err);
+		safeLog(err);
 	}
+}
+
+// strip Basic auth from logging
+function safeLog(obj) {
+	let str = util.inspect(obj);
+	console.log(str.replace(/Basic [+/A-Za-z0-9]+/g,'Basic ******'));
 }
 
