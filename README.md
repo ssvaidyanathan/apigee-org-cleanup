@@ -17,3 +17,6 @@ Clean up script for Apigee Orgs
   - API Proxies
   - API Portals
   - API Specs
+
+## Caveat
+Clean up does not remove monetization-specific entities, and therefore API products and API proxies in monetization orgs may not be completely cleaned up.
